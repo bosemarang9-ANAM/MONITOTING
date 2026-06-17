@@ -345,7 +345,6 @@ if file:
 
         status_box = st.empty()
 
-        debug_box = st.empty()
 
         success = 0
         failed = 0
@@ -359,10 +358,6 @@ if file:
 
             payload = build_payload(
                 row
-            )
-
-            debug_box.json(
-                payload
             )
 
             ok, err = submit_form(
