@@ -14,8 +14,8 @@ from zoneinfo import ZoneInfo
 # =====================================================
 
 FORM_URL = (
-    "https://docs.google.com/forms/d/e/"
-    "1FAIpQLSctpoBfTJgwKF-OlWTSskmE8_nnxHL08gPLdweUzJb4xx5XSw"
+    "https://docs.google.com/forms/u/0/d/e/"
+    "1FAIpQLSdYY2hbRIhrCY_a06uH0keEsBBu8x6P3AzpZ2BmcmVERjaxpQ"
     "/formResponse"
 )
 
@@ -100,15 +100,15 @@ def build_payload(row):
 
     pickup = get_pickup_time()
 
-    payload["entry.1413751263_hour"] = (
+    payload["entry.141665543_hour"] = (
         pickup.strftime("%H")
     )
 
-    payload["entry.1413751263_minute"] = (
+    payload["entry.141665543_minute"] = (
         pickup.strftime("%M")
     )
 
-    payload["entry.1413751263_second"] = (
+    payload["entry.141665543_second"] = (
         pickup.strftime("%S")
     )
 
@@ -122,27 +122,27 @@ def build_payload(row):
         dayfirst=True
     )
 
-    payload["entry.898331271_hour"] = (
+    payload["entry.2062984122_hour"] = (
         create_dt.strftime("%H")
     )
 
-    payload["entry.898331271_minute"] = (
+    payload["entry.2062984122_minute"] = (
         create_dt.strftime("%M")
     )
 
-    payload["entry.898331271_second"] = (
+    payload["entry.2062984122_second"] = (
         create_dt.strftime("%S")
     )
 
-    payload["entry.192424872_day"] = (
+    payload["entry.1418866853_day"] = (
         create_dt.strftime("%d")
     )
 
-    payload["entry.192424872_month"] = (
+    payload["entry.1418866853_month"] = (
         create_dt.strftime("%m")
     )
 
-    payload["entry.192424872_year"] = (
+    payload["entry.1418866853_year"] = (
         create_dt.strftime("%Y")
     )
 
@@ -150,37 +150,37 @@ def build_payload(row):
     # FIELD FORM
     # ---------------------------------
 
-    payload["entry.1884265043"] = clean(
+    payload["entry.1545651914"] = clean(
         row["Nama"]
     )
 
-    payload["entry.7318026"] = clean(
+    payload["entry.1778899713"] = clean(
         row["SBU"]
     )
 
-    payload["entry.1212348438"] = clean(
+    payload["entry.1802806380"] = clean(
         row["ID TICKET"]
     )
 
-    payload["entry.800105676"] = clean(
+    payload["entry.564067612"] = clean(
         row.get(
             "Keterangan Tambahan",
             ""
         )
     )
 
-    payload["entry.513669972"] = clean(
+    payload["entry.822984039"] = clean(
         row["Eskalasi Back Office"]
     )
 
-    payload["entry.286520927"] = clean(
+    payload["entry.49503729"] = clean(
         row["Hasil Eskalasi"]
     )
 
     # sentinel
 
-    payload["entry.513669972_sentinel"] = ""
-    payload["entry.286520927_sentinel"] = ""
+    payload["entry.822984039_sentinel"] = ""
+    payload["entry.49503729_sentinel"] = ""
 
     payload["fvv"] = "1"
     payload["pageHistory"] = "0"
@@ -344,7 +344,6 @@ if file:
         progress_bar = st.progress(0)
 
         status_box = st.empty()
-
 
         success = 0
         failed = 0
