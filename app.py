@@ -4,47 +4,51 @@ import requests
 import random
 import time
 import json
+
 from pathlib import Path
-from datetime import timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
-# =====================================
-# GOOGLE FORM
-# =====================================
+# =====================================================
+# CONFIG
+# =====================================================
 
-FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSctpoBfTJgwKF-OlWTSskmE8_nnxHL08gPLdweUzJb4xx5XSw/formResponse"
-
-# =====================================
-# FILE
-# =====================================
+FORM_URL = (
+    "https://docs.google.com/forms/d/e/"
+    "1FAIpQLSctpoBfTJgwKF-OlWTSskmE8_nnxHL08gPLdweUzJb4xx5XSw"
+    "/formResponse"
+)
 
 PROGRESS_FILE = "progress.json"
 
-# =====================================
+# =====================================================
 # PROGRESS
-# =====================================
+# =====================================================
 
 def load_progress():
 
-    if Path(PROGRESS_FILE).exists():
+    try:
 
-        with open(PROGRESS_FILE, "r") as f:
+        if Path(PROGRESS_FILE).exists():
 
-            return json.load(f).get(
-                "last_success",
-                0
-            )
+            with open(PROGRESS_FILE, "r") as f:
+
+                data = json.load(f)
+
+            return data.get("last_success", 0)
+
+    except:
+        pass
 
     return 0
 
 
-def save_progress(row):
+def save_progress(row_number):
 
     with open(PROGRESS_FILE, "w") as f:
 
         json.dump(
-            {
-                "last_success": row
-            },
+            {"last_success": row_number},
             f
         )
 
@@ -53,134 +57,187 @@ def reset_progress():
 
     save_progress(0)
 
-# =====================================
-# PAYLOAD
-# =====================================
+# =====================================================
+# HELPER
+# =====================================================
 
-def build_payload(row):
+def clean(value):
 
-    create_dt = pd.to_datetime(
-        f"{row['Create Ticket Date']} {row['Create Ticket Time']}",
-        dayfirst=True
+    if pd.isna(value):
+        return ""
+
+    return str(value).strip()
+
+
+def get_pickup_time():
+
+    """
+    Waktu server WIB
+    dikurangi random 1-3 menit
+    """
+
+    now = datetime.now(
+        ZoneInfo("Asia/Jakarta")
     )
 
-    pickup_dt = create_dt - timedelta(
+    pickup = now - timedelta(
         minutes=random.randint(1, 3)
     )
 
-    payload = {
+    return pickup
 
-        # Nama
-        "entry.1884265043":
-        str(row["Nama"]).strip(),
+# =====================================================
+# BUILD PAYLOAD
+# =====================================================
 
-        # SBU
-        "entry.7318026":
-        str(row["SBU"]).strip(),
+def build_payload(row):
 
-        # ID TICKET
-        "entry.1212348438":
-        str(row["ID TICKET"]).strip(),
+    payload = {}
 
-        # Keterangan
-        "entry.800105676":
-        str(
-            row.get(
-                "Keterangan Tambahan",
-                "tidak ada"
-            )
-        ),
+    # ---------------------------------
+    # PICK UP TIME
+    # ---------------------------------
 
-        # Eskalasi
-        "entry.513669972":
-        str(
-            row["Eskalasi Back Office"]
-        ).strip(),
+    pickup = get_pickup_time()
 
-        # Hasil
-        "entry.286520927":
-        str(
-            row["Hasil Eskalasi"]
-        ).strip(),
+    payload["entry.1413751263_hour"] = (
+        pickup.strftime("%H")
+    )
 
-        # PICKUP TIME
-        "entry.1413751263_hour":
-        pickup_dt.strftime("%H"),
+    payload["entry.1413751263_minute"] = (
+        pickup.strftime("%M")
+    )
 
-        "entry.1413751263_minute":
-        pickup_dt.strftime("%M"),
+    payload["entry.1413751263_second"] = (
+        pickup.strftime("%S")
+    )
 
-        "entry.1413751263_second":
-        pickup_dt.strftime("%S"),
+    # ---------------------------------
+    # CREATE DATE & TIME DARI EXCEL
+    # ---------------------------------
 
-        # CREATE TIME
-        "entry.898331271_hour":
-        create_dt.strftime("%H"),
+    create_dt = pd.to_datetime(
+        f"{row['Create Ticket Date']} "
+        f"{row['Create Ticket Time']}",
+        dayfirst=True
+    )
 
-        "entry.898331271_minute":
-        create_dt.strftime("%M"),
+    payload["entry.898331271_hour"] = (
+        create_dt.strftime("%H")
+    )
 
-        "entry.898331271_second":
-        create_dt.strftime("%S"),
+    payload["entry.898331271_minute"] = (
+        create_dt.strftime("%M")
+    )
 
-        # CREATE DATE
-        "entry.192424872_day":
-        create_dt.strftime("%d"),
+    payload["entry.898331271_second"] = (
+        create_dt.strftime("%S")
+    )
 
-        "entry.192424872_month":
-        create_dt.strftime("%m"),
+    payload["entry.192424872_day"] = (
+        create_dt.strftime("%d")
+    )
 
-        "entry.192424872_year":
-        create_dt.strftime("%Y"),
+    payload["entry.192424872_month"] = (
+        create_dt.strftime("%m")
+    )
 
-        # GOOGLE INTERNAL
-        "entry.513669972_sentinel": "",
-        "entry.286520927_sentinel": "",
+    payload["entry.192424872_year"] = (
+        create_dt.strftime("%Y")
+    )
 
-        "fvv": "1",
-        "pageHistory": "0"
+    # ---------------------------------
+    # FIELD FORM
+    # ---------------------------------
 
-    }
+    payload["entry.1884265043"] = clean(
+        row["Nama"]
+    )
+
+    payload["entry.7318026"] = clean(
+        row["SBU"]
+    )
+
+    payload["entry.1212348438"] = clean(
+        row["ID TICKET"]
+    )
+
+    payload["entry.800105676"] = clean(
+        row.get(
+            "Keterangan Tambahan",
+            ""
+        )
+    )
+
+    payload["entry.513669972"] = clean(
+        row["Eskalasi Back Office"]
+    )
+
+    payload["entry.286520927"] = clean(
+        row["Hasil Eskalasi"]
+    )
+
+    # sentinel
+
+    payload["entry.513669972_sentinel"] = ""
+    payload["entry.286520927_sentinel"] = ""
+
+    payload["fvv"] = "1"
+    payload["pageHistory"] = "0"
 
     return payload
 
-# =====================================
+# =====================================================
 # SUBMIT
-# =====================================
+# =====================================================
 
 def submit_form(session, payload):
 
-    for retry in range(3):
+    last_error = ""
+
+    for attempt in range(3):
 
         try:
 
-            r = session.post(
+            response = session.post(
                 FORM_URL,
                 data=payload,
-                timeout=60,
                 headers={
                     "User-Agent":
-                    "Mozilla/5.0"
-                }
+                    "Mozilla/5.0",
+
+                    "Referer":
+                    FORM_URL.replace(
+                        "formResponse",
+                        "viewform"
+                    )
+                },
+                timeout=60
             )
 
-            if r.status_code in [
+            if response.status_code in [
                 200,
                 302
             ]:
 
-                return True
+                return True, ""
 
-        except:
-            pass
+            last_error = (
+                f"HTTP "
+                f"{response.status_code}"
+            )
 
-        time.sleep(5)
+        except Exception as e:
 
-    return False
+            last_error = str(e)
 
-# =====================================
+        time.sleep(3)
+
+    return False, last_error
+
+# =====================================================
 # UI
-# =====================================
+# =====================================================
 
 st.set_page_config(
     page_title="MONIT Importer",
@@ -202,7 +259,7 @@ with col1:
         reset_progress()
 
         st.success(
-            "Progress direset"
+            "Progress berhasil direset"
         )
 
 with col2:
@@ -214,11 +271,15 @@ with col2:
 
 min_delay = st.number_input(
     "Min Delay",
+    min_value=1,
+    max_value=60,
     value=10
 )
 
 max_delay = st.number_input(
     "Max Delay",
+    min_value=1,
+    max_value=120,
     value=30
 )
 
@@ -226,6 +287,10 @@ file = st.file_uploader(
     "Upload Excel",
     type=["xlsx"]
 )
+
+# =====================================================
+# PROCESS
+# =====================================================
 
 if file:
 
@@ -236,11 +301,7 @@ if file:
 
     st.dataframe(df.head())
 
-    st.write(
-        f"Total Data : {len(df)}"
-    )
-
-    required = [
+    required_cols = [
 
         "Nama",
         "ID TICKET",
@@ -253,27 +314,38 @@ if file:
     ]
 
     missing = [
-        c for c in required
+
+        c for c in required_cols
+
         if c not in df.columns
     ]
 
     if missing:
 
         st.error(
-            f"Kolom tidak ditemukan: {missing}"
+            f"Kolom tidak ditemukan: "
+            f"{missing}"
         )
 
         st.stop()
+
+    st.write(
+        f"Total Data : {len(df)}"
+    )
 
     if st.button(
         "START IMPORT"
     ):
 
+        start_row = load_progress()
+
         session = requests.Session()
 
-        progress = st.progress(0)
+        progress_bar = st.progress(0)
 
-        start_row = load_progress()
+        status_box = st.empty()
+
+        debug_box = st.empty()
 
         success = 0
         failed = 0
@@ -289,7 +361,11 @@ if file:
                 row
             )
 
-            ok = submit_form(
+            debug_box.json(
+                payload
+            )
+
+            ok, err = submit_form(
                 session,
                 payload
             )
@@ -302,7 +378,7 @@ if file:
 
                 success += 1
 
-                st.success(
+                status_box.success(
                     f"✓ {row['ID TICKET']}"
                 )
 
@@ -310,13 +386,13 @@ if file:
 
                 failed += 1
 
-                st.error(
-                    f"✗ {row['ID TICKET']}"
+                status_box.error(
+                    f"✗ {row['ID TICKET']} "
+                    f"| {err}"
                 )
 
-            progress.progress(
-                (idx + 1)
-                / len(df)
+            progress_bar.progress(
+                (idx + 1) / len(df)
             )
 
             if idx < len(df) - 1:
@@ -330,7 +406,7 @@ if file:
 
         st.success(
             f"""
-Selesai
+Import selesai
 
 Berhasil : {success}
 
