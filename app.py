@@ -73,7 +73,7 @@ def get_pickup_time():
 
     """
     Waktu server WIB
-    dikurangi random 1-3 menit
+    dikurangi random 30-60 detik
     """
 
     now = datetime.now(
@@ -81,7 +81,7 @@ def get_pickup_time():
     )
 
     pickup = now - timedelta(
-        minutes=random.randint(1, 3)
+        seconds=random.randint(30, 60)
     )
 
     return pickup
