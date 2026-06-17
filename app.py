@@ -1,57 +1,50 @@
 import streamlit as st
 import pandas as pd
 import requests
-import time
 import random
-import traceback
-
+import time
+import json
+from pathlib import Path
 from datetime import datetime
-from datetime import time as dt_time
 
-# =====================================================
-# GOOGLE FORM
-# =====================================================
+FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSctpoBfTJgwKF-OlWTSskmE8_nnxHL08gPLdweUzJb4xx5XSw/formResponse"
 
-FORM_URL = "https://docs.google.com/forms/u/0/d/e/1FAIpQLSdYY2hbRIhrCY_a06uH0keEsBBu8x6P3AzpZ2BmcmVERjaxpQ/formResponse"
+PROGRESS_FILE = "progress.json"
+LOG_SUCCESS = "success_log.xlsx"
+LOG_FAILED = "failed_log.xlsx"
 
-# =====================================================
-# SESSION STATE
-# =====================================================
 
-if "last_success" not in st.session_state:
-    st.session_state.last_success = 0
+def load_progress():
+    if Path(PROGRESS_FILE).exists():
+        try:
+            with open(PROGRESS_FILE, "r") as f:
+                return json.load(f).get("last_row", 0)
+        except:
+            pass
+    return 0
 
-# =====================================================
-# HELPER
-# =====================================================
 
-def clean_value(val):
+def save_progress(row_number):
+    with open(PROGRESS_FILE, "w") as f:
+        json.dump({"last_row": row_number}, f)
 
-    if pd.isna(val):
+
+def reset_progress():
+    save_progress(0)
+
+
+def clean(v):
+    if pd.isna(v):
         return ""
+    return str(v).strip()
 
-    return str(val).strip()
 
-
-def parse_time_excel(value):
-    """
-    Support:
-    23:59:59
-    23:59:59.106000
-    1900-09-30 23:59:59.106000
-    datetime
-    datetime.time
-    """
-
+def parse_time(value):
     if pd.isna(value):
         return None
 
     try:
-
-        if isinstance(value, dt_time):
-            return value.strftime("%H:%M:%S")
-
-        if isinstance(value, datetime):
+        if isinstance(value, (datetime, )):
             return value.strftime("%H:%M:%S")
 
         value = str(value).strip()
@@ -66,7 +59,6 @@ def parse_time_excel(value):
             value = value.split(".")[0]
 
         dt = pd.to_datetime(value)
-
         return dt.strftime("%H:%M:%S")
 
     except:
@@ -75,344 +67,178 @@ def parse_time_excel(value):
 
 def build_payload(row):
 
-    payload = {}
+    payload = {
+        "entry.1884265043": clean(row.get("Nama")),
+        "entry.7318026": clean(row.get("SBU")),
+        "entry.1212348438": clean(row.get("ID TICKET")),
+        "entry.800105676": clean(row.get("Keterangan Tambahan")),
+        "entry.513669972": clean(row.get("Eskalasi Back Office")),
+        "entry.286520927": clean(row.get("Hasil Eskalasi")),
+    }
 
-    payload["entry.154565194"] = clean_value(
-        row.get("Nama")
-    )
-
-    payload["entry.1778899713"] = clean_value(
-        row.get("SBU")
-    )
-
-    payload["entry.1802806380"] = clean_value(
-        row.get("ID TICKET")
-    )
-
-    payload["entry.822984039"] = clean_value(
-        row.get("Eskalasi Back Office")
-    )
-
-    payload["entry.49503729"] = (
-        clean_value(
-            row.get("Hasil Eskalasi")
-        ) or "No respon"
-    )
-
-    payload["entry.564067612"] = (
-        clean_value(
-            row.get("Keterangan Tambahan")
-        ) or "-"
-    )
-
-    # ====================================
-    # PICK UP TIME
-    # ====================================
-
-    pickup = parse_time_excel(
-        row.get("Pick Up Time")
-    )
-
+    pickup = parse_time(row.get("Pick Up Time"))
     if pickup:
-
         h, m, s = pickup.split(":")
+        payload["entry.1413751263_hour"] = h
+        payload["entry.1413751263_minute"] = m
+        payload["entry.1413751263_second"] = s
 
-        payload["entry.141665543_hour"] = h
-        payload["entry.141665543_minute"] = m
-        payload["entry.141665543_second"] = s
-
-    # ====================================
-    # CREATE DATE
-    # ====================================
+    create_time = parse_time(row.get("Create Ticket Time"))
+    if create_time:
+        h, m, s = create_time.split(":")
+        payload["entry.898331271_hour"] = h
+        payload["entry.898331271_minute"] = m
+        payload["entry.898331271_second"] = s
 
     try:
-
-        tanggal = pd.to_datetime(
-            row.get("Create Ticket Date"),
-            dayfirst=True
-        )
-
-        payload["entry.1418866853_day"] = str(
-            tanggal.day
-        )
-
-        payload["entry.1418866853_month"] = str(
-            tanggal.month
-        )
-
-        payload["entry.1418866853_year"] = str(
-            tanggal.year
-        )
-
+        tgl = pd.to_datetime(row.get("Create Ticket Date"), dayfirst=True)
+        payload["entry.192424872_day"] = str(tgl.day)
+        payload["entry.192424872_month"] = str(tgl.month)
+        payload["entry.192424872_year"] = str(tgl.year)
     except:
         pass
-
-    # ====================================
-    # CREATE TIME
-    # ====================================
-
-    create_time = parse_time_excel(
-        row.get("Create Ticket Time")
-    )
-
-    if create_time:
-
-        h, m, s = create_time.split(":")
-
-        payload["entry.2062984122_hour"] = h
-        payload["entry.2062984122_minute"] = m
-        payload["entry.2062984122_second"] = s
 
     return payload
 
 
-# =====================================================
-# UI
-# =====================================================
+def submit_form(session, payload):
 
-st.set_page_config(
-    page_title="Excel ➜ Google Form Importer",
-    layout="wide"
-)
+    for _ in range(3):
 
-st.title("Excel ➜ Google Form Importer")
+        try:
+            r = session.post(
+                FORM_URL,
+                data=payload,
+                headers={
+                    "User-Agent": "Mozilla/5.0",
+                    "Referer": FORM_URL.replace("formResponse", "viewform")
+                },
+                timeout=60
+            )
 
-max_delay = st.slider(
-    "Jeda Maksimum Antar Data (detik)",
-    min_value=1,
-    max_value=30,
-    value=20,
-    step=1
-)
+            if r.status_code in [200, 302]:
+                return True
 
-st.caption(
-    f"Jeda akan diacak otomatis antara "
-    f"{max(3,max_delay//3)} - {max_delay} detik"
-)
+        except:
+            pass
 
-file = st.file_uploader(
-    "Upload Excel",
-    type=["xlsx"]
-)
+        time.sleep(5)
+
+    return False
+
+
+st.set_page_config(page_title="MONIT Importer", layout="wide")
+
+st.title("Excel ➜ Google Form MONIT")
 
 col1, col2 = st.columns(2)
 
 with col1:
-
     if st.button("Reset Progress"):
-
-        st.session_state.last_success = 0
-
-        st.success(
-            "Progress berhasil direset"
-        )
+        reset_progress()
+        st.success("Progress direset")
 
 with col2:
+    st.info(f"Last Success Row : {load_progress()}")
 
-    st.info(
-        f"Baris terakhir berhasil : "
-        f"{st.session_state.last_success}"
-    )
+min_delay = st.number_input("Min Delay", 10, 60, 10)
+max_delay = st.number_input("Max Delay", 10, 120, 30)
 
-# =====================================================
-# LOAD FILE
-# =====================================================
+file = st.file_uploader("Upload Excel", type=["xlsx"])
 
 if file:
 
     df = pd.read_excel(file)
-
     df = df.dropna(how="all")
 
     st.dataframe(df.head())
+    st.write("Total Data :", len(df))
 
-    st.write(
-        f"Total data : {len(df)}"
-    )
+    required_cols = [
+        "Nama",
+        "ID TICKET",
+        "SBU",
+        "Eskalasi Back Office",
+        "Pick Up Time",
+        "Create Ticket Date",
+        "Create Ticket Time",
+        "Hasil Eskalasi",
+        "Keterangan Tambahan"
+    ]
 
-    avg_delay = (
-        max(3, max_delay // 3)
-        + max_delay
-    ) / 2
+    missing = [c for c in required_cols if c not in df.columns]
 
-    estimasi = int(
-        (len(df) - st.session_state.last_success)
-        * avg_delay
-    )
+    if missing:
+        st.error(f"Kolom tidak ditemukan: {missing}")
+        st.stop()
 
-    menit = estimasi // 60
-    detik = estimasi % 60
+    if st.button("START IMPORT"):
 
-    st.info(
-        f"Estimasi waktu proses : "
-        f"{menit} menit {detik} detik"
-    )
-
-    if st.button("Kirim ke Google Form"):
+        start_row = load_progress()
 
         progress = st.progress(0)
+        status = st.empty()
 
-        status_box = st.empty()
+        success_log = []
+        failed_log = []
 
-        countdown_box = st.empty()
-
-        log_box = st.empty()
+        session = requests.Session()
 
         sukses = 0
         gagal = 0
 
-        session = requests.Session()
+        for idx in range(start_row, len(df)):
 
-        start_row = st.session_state.last_success
+            row = df.iloc[idx]
 
-        for nomor in range(
-            start_row,
-            len(df)
-        ):
+            payload = build_payload(row)
 
-            row = df.iloc[nomor]
+            result = submit_form(session, payload)
 
-            try:
+            if result:
 
-                payload = build_payload(row)
+                sukses += 1
 
-                if payload.get(
-                    "entry.154565194",
-                    ""
-                ) == "":
+                save_progress(idx + 1)
 
-                    gagal += 1
+                success_log.append({
+                    "row": idx + 1,
+                    "ticket": row["ID TICKET"],
+                    "status": "SUCCESS"
+                })
 
-                    continue
-
-                berhasil = False
-
-                for retry in range(3):
-
-                    try:
-
-                        response = session.post(
-                            FORM_URL,
-                            data=payload,
-                            headers={
-                                "User-Agent":
-                                "Mozilla/5.0",
-                                "Referer":
-                                FORM_URL.replace(
-                                    "formResponse",
-                                    "viewform"
-                                )
-                            },
-                            timeout=60
-                        )
-
-                        if response.status_code in [200, 302]:
-
-                            berhasil = True
-                            break
-
-                    except:
-
-                        time.sleep(5)
-
-                if berhasil:
-
-                    sukses += 1
-
-                    st.session_state.last_success = (
-                        nomor + 1
-                    )
-
-                    status_box.success(
-                        f"✓ Baris {nomor+1} berhasil "
-                        f"({payload.get('entry.1802806380','-')})"
-                    )
-
-                else:
-
-                    gagal += 1
-
-                    status_box.error(
-                        f"✗ Baris {nomor+1} gagal"
-                    )
-
-                progress.progress(
-                    (nomor + 1)
-                    / len(df)
+                status.success(
+                    f"✓ Row {idx+1} berhasil - {row['ID TICKET']}"
                 )
 
-                log_box.info(
-                    f"""
-Progress : {nomor+1}/{len(df)}
-
-Berhasil : {sukses}
-
-Gagal : {gagal}
-
-Last Success :
-{st.session_state.last_success}
-"""
-                )
-
-                # ==================================
-                # RANDOM DELAY
-                # ==================================
-
-                if nomor < len(df) - 1:
-
-                    random_delay = random.randint(
-                        max(3, max_delay // 3),
-                        max_delay
-                    )
-
-                    for sisa in range(
-                        random_delay,
-                        0,
-                        -1
-                    ):
-
-                        countdown_box.info(
-                            f"""
-Jeda Acak :
-{random_delay} detik
-
-Data ke-{nomor+1}
-berhasil dikirim
-
-Menunggu :
-{sisa} detik
-"""
-                        )
-
-                        time.sleep(1)
-
-                    countdown_box.empty()
-
-            except Exception as e:
+            else:
 
                 gagal += 1
 
-                st.error(
-                    f"""
-Baris {nomor+1} ERROR
+                failed_log.append(row.to_dict())
 
-{str(e)}
-
-{traceback.format_exc()}
-"""
+                status.error(
+                    f"✗ Row {idx+1} gagal - {row['ID TICKET']}"
                 )
 
+            progress.progress((idx + 1) / len(df))
+
+            if idx < len(df) - 1:
+                delay = random.randint(min_delay, max_delay)
+                time.sleep(delay)
+
+        if success_log:
+            pd.DataFrame(success_log).to_excel(
+                LOG_SUCCESS,
+                index=False
+            )
+
+        if failed_log:
+            pd.DataFrame(failed_log).to_excel(
+                LOG_FAILED,
+                index=False
+            )
+
         st.success(
-            f"""
-SELESAI
-
-Berhasil : {sukses}
-
-Gagal : {gagal}
-
-Total : {len(df)}
-
-Progress tersimpan :
-{st.session_state.last_success}
-"""
+            f"Selesai | Berhasil={sukses} | Gagal={gagal}"
         )
