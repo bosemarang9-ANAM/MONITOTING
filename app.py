@@ -7,39 +7,32 @@ import json
 from pathlib import Path
 from datetime import timedelta
 
-# =====================================================
-# CONFIG
-# =====================================================
+# =====================================
+# GOOGLE FORM
+# =====================================
 
-FORM_URL = (
-    "https://docs.google.com/forms/d/e/"
-    "1FAIpQLSctpoBfTJgwKF-OlWTSskmE8_nnxHL08gPLdweUzJb4xx5XSw"
-    "/formResponse"
-)
+FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSctpoBfTJgwKF-OlWTSskmE8_nnxHL08gPLdweUzJb4xx5XSw/formResponse"
+
+# =====================================
+# FILE
+# =====================================
 
 PROGRESS_FILE = "progress.json"
-SUCCESS_LOG = "success_log.xlsx"
-FAILED_LOG = "failed_log.xlsx"
 
-# =====================================================
+# =====================================
 # PROGRESS
-# =====================================================
+# =====================================
 
 def load_progress():
 
-    try:
+    if Path(PROGRESS_FILE).exists():
 
-        if Path(PROGRESS_FILE).exists():
+        with open(PROGRESS_FILE, "r") as f:
 
-            with open(PROGRESS_FILE, "r") as f:
-
-                return json.load(f).get(
-                    "last_success",
-                    0
-                )
-
-    except:
-        pass
+            return json.load(f).get(
+                "last_success",
+                0
+            )
 
     return 0
 
@@ -49,7 +42,9 @@ def save_progress(row):
     with open(PROGRESS_FILE, "w") as f:
 
         json.dump(
-            {"last_success": row},
+            {
+                "last_success": row
+            },
             f
         )
 
@@ -58,193 +53,134 @@ def reset_progress():
 
     save_progress(0)
 
-# =====================================================
-# HELPER
-# =====================================================
-
-def clean(value):
-
-    if pd.isna(value):
-        return ""
-
-    return str(value).strip()
-
-
-def generate_pickup_time(timestamp_value):
-
-    try:
-
-        ts = pd.to_datetime(
-            timestamp_value,
-            dayfirst=True
-        )
-
-        minus_minutes = random.randint(
-            1,
-            3
-        )
-
-        pickup = ts - timedelta(
-            minutes=minus_minutes
-        )
-
-        return pickup
-
-    except:
-        return None
-
-# =====================================================
-# BUILD PAYLOAD
-# =====================================================
+# =====================================
+# PAYLOAD
+# =====================================
 
 def build_payload(row):
 
-    payload = {}
-
-    # =====================
-    # FIELD UTAMA
-    # =====================
-
-    payload["entry.1884265043"] = clean(
-        row.get("Nama")
-    )
-
-    payload["entry.7318026"] = clean(
-        row.get("SBU")
-    )
-
-    payload["entry.1212348438"] = clean(
-        row.get("ID TICKET")
-    )
-
-    payload["entry.800105676"] = (
-        clean(
-            row.get("Keterangan Tambahan")
-        ) or "tidak ada"
-    )
-
-    payload["entry.513669972"] = clean(
-        row.get("Eskalasi Back Office")
-    )
-
-    payload["entry.286520927"] = clean(
-        row.get("Hasil Eskalasi")
-    )
-
-    # =====================
-    # TIMESTAMP
-    # =====================
-
-    ts = pd.to_datetime(
-        row.get("Timestamp"),
+    create_dt = pd.to_datetime(
+        f"{row['Create Ticket Date']} {row['Create Ticket Time']}",
         dayfirst=True
     )
 
-    # =====================
-    # PICK UP TIME
-    # =====================
-
-    pickup = generate_pickup_time(
-        row.get("Timestamp")
+    pickup_dt = create_dt - timedelta(
+        minutes=random.randint(1, 3)
     )
 
-    payload["entry.1413751263_hour"] = \
-        pickup.strftime("%H")
+    payload = {
 
-    payload["entry.1413751263_minute"] = \
-        pickup.strftime("%M")
+        # Nama
+        "entry.1884265043":
+        str(row["Nama"]).strip(),
 
-    payload["entry.1413751263_second"] = \
-        pickup.strftime("%S")
+        # SBU
+        "entry.7318026":
+        str(row["SBU"]).strip(),
 
-    # =====================
-    # CREATE TIME
-    # =====================
+        # ID TICKET
+        "entry.1212348438":
+        str(row["ID TICKET"]).strip(),
 
-    payload["entry.898331271_hour"] = \
-        ts.strftime("%H")
+        # Keterangan
+        "entry.800105676":
+        str(
+            row.get(
+                "Keterangan Tambahan",
+                "tidak ada"
+            )
+        ),
 
-    payload["entry.898331271_minute"] = \
-        ts.strftime("%M")
+        # Eskalasi
+        "entry.513669972":
+        str(
+            row["Eskalasi Back Office"]
+        ).strip(),
 
-    payload["entry.898331271_second"] = \
-        ts.strftime("%S")
+        # Hasil
+        "entry.286520927":
+        str(
+            row["Hasil Eskalasi"]
+        ).strip(),
 
-    # =====================
-    # CREATE DATE
-    # =====================
+        # PICKUP TIME
+        "entry.1413751263_hour":
+        pickup_dt.strftime("%H"),
 
-    payload["entry.192424872_day"] = \
-        ts.strftime("%d")
+        "entry.1413751263_minute":
+        pickup_dt.strftime("%M"),
 
-    payload["entry.192424872_month"] = \
-        ts.strftime("%m")
+        "entry.1413751263_second":
+        pickup_dt.strftime("%S"),
 
-    payload["entry.192424872_year"] = \
-        ts.strftime("%Y")
+        # CREATE TIME
+        "entry.898331271_hour":
+        create_dt.strftime("%H"),
 
-    # =====================
-    # GOOGLE INTERNAL
-    # =====================
+        "entry.898331271_minute":
+        create_dt.strftime("%M"),
 
-    payload["entry.513669972_sentinel"] = ""
-    payload["entry.286520927_sentinel"] = ""
+        "entry.898331271_second":
+        create_dt.strftime("%S"),
 
-    payload["fvv"] = "1"
-    payload["pageHistory"] = "0"
+        # CREATE DATE
+        "entry.192424872_day":
+        create_dt.strftime("%d"),
+
+        "entry.192424872_month":
+        create_dt.strftime("%m"),
+
+        "entry.192424872_year":
+        create_dt.strftime("%Y"),
+
+        # GOOGLE INTERNAL
+        "entry.513669972_sentinel": "",
+        "entry.286520927_sentinel": "",
+
+        "fvv": "1",
+        "pageHistory": "0"
+
+    }
 
     return payload
 
-# =====================================================
+# =====================================
 # SUBMIT
-# =====================================================
+# =====================================
 
 def submit_form(session, payload):
-
-    last_error = ""
 
     for retry in range(3):
 
         try:
 
-            response = session.post(
+            r = session.post(
                 FORM_URL,
                 data=payload,
+                timeout=60,
                 headers={
                     "User-Agent":
-                    "Mozilla/5.0",
-
-                    "Referer":
-                    FORM_URL.replace(
-                        "formResponse",
-                        "viewform"
-                    )
-                },
-                timeout=60
+                    "Mozilla/5.0"
+                }
             )
 
-            if response.status_code in [
+            if r.status_code in [
                 200,
                 302
             ]:
 
-                return True, ""
+                return True
 
-            last_error = (
-                f"HTTP {response.status_code}"
-            )
-
-        except Exception as e:
-
-            last_error = str(e)
+        except:
+            pass
 
         time.sleep(5)
 
-    return False, last_error
+    return False
 
-# =====================================================
+# =====================================
 # UI
-# =====================================================
+# =====================================
 
 st.set_page_config(
     page_title="MONIT Importer",
@@ -266,7 +202,7 @@ with col1:
         reset_progress()
 
         st.success(
-            "Progress berhasil direset"
+            "Progress direset"
         )
 
 with col2:
@@ -278,15 +214,11 @@ with col2:
 
 min_delay = st.number_input(
     "Min Delay",
-    min_value=1,
-    max_value=60,
     value=10
 )
 
 max_delay = st.number_input(
     "Max Delay",
-    min_value=1,
-    max_value=120,
     value=30
 )
 
@@ -295,28 +227,12 @@ file = st.file_uploader(
     type=["xlsx"]
 )
 
-# =====================================================
-# LOAD FILE
-# =====================================================
-
 if file:
 
-    try:
-
-        df = pd.read_excel(
-            file,
-            engine="openpyxl"
-        )
-
-    except Exception as e:
-
-        st.error(
-            f"Gagal membaca file: {e}"
-        )
-
-        st.stop()
-
-    df = df.dropna(how="all")
+    df = pd.read_excel(
+        file,
+        engine="openpyxl"
+    )
 
     st.dataframe(df.head())
 
@@ -324,35 +240,27 @@ if file:
         f"Total Data : {len(df)}"
     )
 
-    required_cols = [
-
-        "Timestamp",
+    required = [
 
         "Nama",
-
         "ID TICKET",
-
         "SBU",
-
         "Eskalasi Back Office",
+        "Create Ticket Date",
+        "Create Ticket Time",
+        "Hasil Eskalasi"
 
-        "Hasil Eskalasi",
-
-        "Keterangan Tambahan"
     ]
 
     missing = [
-
-        c for c in required_cols
-
+        c for c in required
         if c not in df.columns
     ]
 
     if missing:
 
         st.error(
-            f"Kolom tidak ditemukan: "
-            f"{missing}"
+            f"Kolom tidak ditemukan: {missing}"
         )
 
         st.stop()
@@ -361,23 +269,14 @@ if file:
         "START IMPORT"
     ):
 
-        start_row = load_progress()
+        session = requests.Session()
 
         progress = st.progress(0)
 
-        status_box = st.empty()
+        start_row = load_progress()
 
-        payload_box = st.empty()
-
-        session = requests.Session()
-
-        success_log = []
-
-        failed_log = []
-
-        sukses = 0
-
-        gagal = 0
+        success = 0
+        failed = 0
 
         for idx in range(
             start_row,
@@ -390,52 +289,29 @@ if file:
                 row
             )
 
-            payload_box.json(
-                payload
-            )
-
-            berhasil, error = submit_form(
+            ok = submit_form(
                 session,
                 payload
             )
 
-            if berhasil:
-
-                sukses += 1
+            if ok:
 
                 save_progress(
                     idx + 1
                 )
 
-                success_log.append({
+                success += 1
 
-                    "Row":
-                    idx + 1,
-
-                    "Ticket":
-                    row["ID TICKET"],
-
-                    "Status":
-                    "SUCCESS"
-                })
-
-                status_box.success(
-                    f"✓ Row {idx+1} berhasil "
-                    f"- {row['ID TICKET']}"
+                st.success(
+                    f"✓ {row['ID TICKET']}"
                 )
 
             else:
 
-                gagal += 1
+                failed += 1
 
-                failed_log.append(
-                    row.to_dict()
-                )
-
-                status_box.error(
-                    f"✗ Row {idx+1} gagal "
-                    f"- {row['ID TICKET']} "
-                    f"| {error}"
+                st.error(
+                    f"✗ {row['ID TICKET']}"
                 )
 
             progress.progress(
@@ -452,30 +328,12 @@ if file:
 
                 time.sleep(delay)
 
-        if success_log:
-
-            pd.DataFrame(
-                success_log
-            ).to_excel(
-                SUCCESS_LOG,
-                index=False
-            )
-
-        if failed_log:
-
-            pd.DataFrame(
-                failed_log
-            ).to_excel(
-                FAILED_LOG,
-                index=False
-            )
-
         st.success(
             f"""
-SELESAI
+Selesai
 
-Berhasil : {sukses}
+Berhasil : {success}
 
-Gagal : {gagal}
+Gagal : {failed}
 """
         )
