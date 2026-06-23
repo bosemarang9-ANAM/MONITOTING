@@ -20,6 +20,11 @@ FORM_URL = (
 )
 
 PROGRESS_FILE = "progress.json"
+# =====================================================
+# PICKUP TIME CHAIN
+# =====================================================
+
+last_submit_time = None
 
 # =====================================================
 # PROGRESS
@@ -71,18 +76,23 @@ def clean(value):
 
 def get_pickup_time():
 
-    """
-    Waktu server WIB
-    dikurangi random 30-60 detik
-    """
+    global last_submit_time
 
     now = datetime.now(
         ZoneInfo("Asia/Jakarta")
     )
 
-    pickup = now - timedelta(
-        seconds=random.randint(30, 60)
-    )
+    # Data pertama
+    if last_submit_time is None:
+
+        pickup = now - timedelta(
+            seconds=random.randint(30, 60)
+        )
+
+    # Data berikutnya
+    else:
+
+        pickup = last_submit_time
 
     return pickup
 
@@ -365,11 +375,15 @@ if file:
             )
 
             if ok:
-
+                
+                last_submit_time = datetime.now(
+                    ZoneInfo("Asia/Jakarta")
+                )
+            
                 save_progress(
                     idx + 1
                 )
-
+            
                 success += 1
 
                 status_box.success(
