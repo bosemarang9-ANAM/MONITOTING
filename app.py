@@ -80,16 +80,32 @@ def send_otp(username):
     st.session_state.otp = otp
     st.session_state.otp_sent = True
     st.session_state.otp_try = 0
-    st.session_state.otp_expired = (
-        datetime.now() +
-        timedelta(minutes=5)
-    )
+    st.session_state.otp_expired = datetime.now() + timedelta(minutes=5)
 
     phone = st.secrets["phone"][username]
-
     token = st.secrets["fonnte"]["token"]
 
-    message = f"""
+    # DEBUG
+    st.write("Mengirim OTP ke:", phone)
+    st.write("Token:", token[:10] + "...")
+
+    r = requests.post(
+        "https://api.fonnte.com/send",
+        headers={
+            "Authorization": token
+        },
+        data={
+            "target": phone,
+            "message": f"Kode OTP MONIT: {otp}"
+        },
+        timeout=30
+    )
+
+    st.write("HTTP :", r.status_code)
+    st.write("Response :", r.text)
+
+    return r.status_code == 200
+    
 🔐 LOGIN MONIT
 
 Kode OTP Anda
