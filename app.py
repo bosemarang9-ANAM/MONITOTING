@@ -341,9 +341,9 @@ with st.sidebar:
 
         st.rerun()
 
-            st.title("📊 Excel → Google Form MONIT")
+        st.title("📊 Excel → Google Form MONIT")
             
-            col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2)
 
 # =====================================================
 # PROCESS
