@@ -254,6 +254,52 @@ def submit_form(session, payload):
         time.sleep(3)
 
     return False, last_error
+# =====================================================
+# LOGIN
+# =====================================================
+
+def check_login(username, password):
+
+    users = st.secrets["users"]
+
+    if username not in users:
+        return False
+
+    return users[username] == password
+
+
+def login_page():
+
+    st.title("🔐 Login MONIT")
+
+    st.markdown("---")
+
+    username = st.text_input(
+        "Username"
+    )
+
+    password = st.text_input(
+        "Password",
+        type="password"
+    )
+
+    if st.button(
+        "Login",
+        use_container_width=True
+    ):
+
+        if check_login(username, password):
+
+            st.session_state.logged_in = True
+            st.session_state.username = username
+
+            st.rerun()
+
+        else:
+
+            st.error(
+                "Username atau Password salah."
+            )
 
 # =====================================================
 # UI
