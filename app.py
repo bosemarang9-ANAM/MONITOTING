@@ -14,10 +14,6 @@ from zoneinfo import ZoneInfo
 # =====================================================
 
 USERS = {
-    "admin": {
-        "password": "admin123",
-        "role": "Admin"
-    },
     "cs": {
         "password": "cs123",
         "role": "CS"
