@@ -11,23 +11,30 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 # =====================================================
-# LOGIN SESSION
+# PAGE CONFIG
 # =====================================================
 
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
+st.set_page_config(
+    page_title="MONIT Importer",
+    layout="wide"
+)
 
-if "username" not in st.session_state:
-    st.session_state.username = ""
+# =====================================================
+# SESSION
+# =====================================================
 
-if "otp" not in st.session_state:
-    st.session_state.otp = None
+DEFAULT_SESSION = {
+    "logged_in": False,
+    "username": "",
+    "otp": "",
+    "otp_sent": False,
+    "otp_expired": None,
+    "otp_try": 0
+}
 
-if "otp_sent" not in st.session_state:
-    st.session_state.otp_sent = False
-
-if "otp_expired" not in st.session_state:
-    st.session_state.otp_expired = None
+for key, value in DEFAULT_SESSION.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 # =====================================================
 # CONFIG
@@ -40,11 +47,218 @@ FORM_URL = (
 )
 
 PROGRESS_FILE = "progress.json"
-# =====================================================
-# PICKUP TIME CHAIN
-# =====================================================
 
 last_submit_time = None
+
+# =====================================================
+# LOGIN
+# =====================================================
+
+def check_login(username, password):
+
+    users = st.secrets["users"]
+
+    if username not in users:
+        return False
+
+    return users[username] == password
+
+# =====================================================
+# OTP
+# =====================================================
+
+def generate_otp():
+
+    return str(
+        secrets.randbelow(900000) + 100000
+    )
+
+def send_otp(username):
+
+    otp = generate_otp()
+
+    st.session_state.otp = otp
+    st.session_state.otp_sent = True
+    st.session_state.otp_try = 0
+    st.session_state.otp_expired = (
+        datetime.now() +
+        timedelta(minutes=5)
+    )
+
+    phone = st.secrets["phone"][username]
+
+    token = st.secrets["fonnte"]["token"]
+
+    message = f"""
+🔐 LOGIN MONIT
+
+Kode OTP Anda
+
+{otp}
+
+OTP berlaku selama 5 menit.
+
+Jangan berikan kode ini kepada siapa pun.
+"""
+
+    r = requests.post(
+        "https://api.fonnte.com/send",
+        headers={
+            "Authorization": token
+        },
+        data={
+            "target": phone,
+            "message": message
+        },
+        timeout=30
+    )
+
+    return r.status_code == 200
+
+# =====================================================
+# LOGIN PAGE
+# =====================================================
+
+def login_page():
+
+    st.title("🔐 MONIT LOGIN")
+
+    st.markdown("---")
+
+    # ==================================
+    # STEP 1
+    # ==================================
+
+    if not st.session_state.otp_sent:
+
+        username = st.text_input(
+            "Username"
+        )
+
+        password = st.text_input(
+            "Password",
+            type="password"
+        )
+
+        if st.button(
+            "Login",
+            use_container_width=True
+        ):
+
+            if check_login(
+                username,
+                password
+            ):
+
+                st.session_state.username = username
+
+                ok = send_otp(username)
+
+                if ok:
+
+                    st.success(
+                        "OTP berhasil dikirim ke WhatsApp."
+                    )
+
+                    st.rerun()
+
+                else:
+
+                    st.error(
+                        "Gagal mengirim OTP."
+                    )
+
+            else:
+
+                st.error(
+                    "Username atau Password salah."
+                )
+
+    # ==================================
+    # STEP 2
+    # ==================================
+
+    else:
+
+        st.success(
+            f"OTP telah dikirim ke nomor admin."
+        )
+
+        otp = st.text_input(
+            "Masukkan OTP"
+        )
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+
+            if st.button(
+                "Verifikasi OTP",
+                use_container_width=True
+            ):
+
+                if datetime.now() > st.session_state.otp_expired:
+
+                    st.error(
+                        "OTP sudah kedaluwarsa."
+                    )
+
+                    st.session_state.otp_sent = False
+
+                    st.rerun()
+
+                elif otp == st.session_state.otp:
+
+                    st.session_state.logged_in = True
+                    st.session_state.otp_sent = False
+                    st.session_state.otp = ""
+
+                    st.rerun()
+
+                else:
+
+                    st.session_state.otp_try += 1
+
+                    if st.session_state.otp_try >= 3:
+
+                        st.error(
+                            "OTP salah 3 kali. Login direset."
+                        )
+
+                        st.session_state.otp_sent = False
+
+                        st.rerun()
+
+                    else:
+
+                        st.error(
+                            f"OTP salah ({st.session_state.otp_try}/3)"
+                        )
+
+        with col2:
+
+            if st.button(
+                "Kirim Ulang OTP",
+                use_container_width=True
+            ):
+
+                send_otp(
+                    st.session_state.username
+                )
+
+                st.success(
+                    "OTP baru telah dikirim."
+                )
+
+                st.rerun()
+
+# =====================================================
+# AUTH
+# =====================================================
+
+if not st.session_state.logged_in:
+    login_page()
+    st.stop()
 
 # =====================================================
 # PROGRESS
@@ -60,9 +274,13 @@ def load_progress():
 
                 data = json.load(f)
 
-            return data.get("last_success", 0)
+            return data.get(
+                "last_success",
+                0
+            )
 
-    except:
+    except Exception:
+
         pass
 
     return 0
@@ -70,10 +288,15 @@ def load_progress():
 
 def save_progress(row_number):
 
-    with open(PROGRESS_FILE, "w") as f:
+    with open(
+        PROGRESS_FILE,
+        "w"
+    ) as f:
 
         json.dump(
-            {"last_success": row_number},
+            {
+                "last_success": row_number
+            },
             f
         )
 
@@ -82,6 +305,7 @@ def reset_progress():
 
     save_progress(0)
 
+
 # =====================================================
 # HELPER
 # =====================================================
@@ -89,6 +313,7 @@ def reset_progress():
 def clean(value):
 
     if pd.isna(value):
+
         return ""
 
     return str(value).strip()
@@ -102,19 +327,21 @@ def get_pickup_time():
         ZoneInfo("Asia/Jakarta")
     )
 
-    # Data pertama
     if last_submit_time is None:
 
         pickup = now - timedelta(
-            seconds=random.randint(30, 60)
+            seconds=random.randint(
+                30,
+                60
+            )
         )
 
-    # Data berikutnya
     else:
 
         pickup = last_submit_time
 
     return pickup
+
 
 # =====================================================
 # BUILD PAYLOAD
@@ -124,61 +351,40 @@ def build_payload(row):
 
     payload = {}
 
-    # ---------------------------------
-    # PICK UP TIME
-    # ---------------------------------
+    # -----------------------------
+    # PICKUP TIME
+    # -----------------------------
 
     pickup = get_pickup_time()
 
-    payload["entry.141665543_hour"] = (
-        pickup.strftime("%H")
-    )
+    payload["entry.141665543_hour"] = pickup.strftime("%H")
+    payload["entry.141665543_minute"] = pickup.strftime("%M")
+    payload["entry.141665543_second"] = pickup.strftime("%S")
 
-    payload["entry.141665543_minute"] = (
-        pickup.strftime("%M")
-    )
-
-    payload["entry.141665543_second"] = (
-        pickup.strftime("%S")
-    )
-
-    # ---------------------------------
-    # CREATE DATE & TIME DARI EXCEL
-    # ---------------------------------
+    # -----------------------------
+    # CREATE DATE TIME
+    # -----------------------------
 
     create_dt = pd.to_datetime(
+
         f"{row['Create Ticket Date']} "
         f"{row['Create Ticket Time']}",
+
         dayfirst=True
+
     )
 
-    payload["entry.2062984122_hour"] = (
-        create_dt.strftime("%H")
-    )
+    payload["entry.2062984122_hour"] = create_dt.strftime("%H")
+    payload["entry.2062984122_minute"] = create_dt.strftime("%M")
+    payload["entry.2062984122_second"] = create_dt.strftime("%S")
 
-    payload["entry.2062984122_minute"] = (
-        create_dt.strftime("%M")
-    )
+    payload["entry.1418866853_day"] = create_dt.strftime("%d")
+    payload["entry.1418866853_month"] = create_dt.strftime("%m")
+    payload["entry.1418866853_year"] = create_dt.strftime("%Y")
 
-    payload["entry.2062984122_second"] = (
-        create_dt.strftime("%S")
-    )
-
-    payload["entry.1418866853_day"] = (
-        create_dt.strftime("%d")
-    )
-
-    payload["entry.1418866853_month"] = (
-        create_dt.strftime("%m")
-    )
-
-    payload["entry.1418866853_year"] = (
-        create_dt.strftime("%Y")
-    )
-
-    # ---------------------------------
+    # -----------------------------
     # FIELD FORM
-    # ---------------------------------
+    # -----------------------------
 
     payload["entry.154565194"] = clean(
         row["Nama"]
@@ -193,10 +399,12 @@ def build_payload(row):
     )
 
     payload["entry.564067612"] = clean(
+
         row.get(
             "Keterangan Tambahan",
             ""
         )
+
     )
 
     payload["entry.822984039"] = clean(
@@ -207,7 +415,9 @@ def build_payload(row):
         row["Hasil Eskalasi"]
     )
 
-    # sentinel
+    # -----------------------------
+    # Sentinel
+    # -----------------------------
 
     payload["entry.822984039_sentinel"] = ""
     payload["entry.49503729_sentinel"] = ""
@@ -217,11 +427,17 @@ def build_payload(row):
 
     return payload
 
+
 # =====================================================
-# SUBMIT
+# SUBMIT GOOGLE FORM
 # =====================================================
 
-def submit_form(session, payload):
+def submit_form(
+
+    session,
+    payload
+
+):
 
     last_error = ""
 
@@ -230,9 +446,13 @@ def submit_form(session, payload):
         try:
 
             response = session.post(
+
                 FORM_URL,
+
                 data=payload,
+
                 headers={
+
                     "User-Agent":
                     "Mozilla/5.0",
 
@@ -241,20 +461,27 @@ def submit_form(session, payload):
                         "formResponse",
                         "viewform"
                     )
+
                 },
+
                 timeout=60
+
             )
 
             if response.status_code in [
+
                 200,
                 302
+
             ]:
 
                 return True, ""
 
             last_error = (
+
                 f"HTTP "
                 f"{response.status_code}"
+
             )
 
         except Exception as e:
@@ -263,190 +490,102 @@ def submit_form(session, payload):
 
         time.sleep(3)
 
-    return False, last_error
-# =====================================================
-# LOGIN
-# =====================================================
+    return (
 
-def check_login(username, password):
+        False,
 
-    users = st.secrets["users"]
+        last_error
 
-    if username not in users:
-        return False
-
-    return users[username] == password
-
-def send_otp(phone, otp):
-
-    token = st.secrets["fonnte"]["token"]
-
-    requests.post(
-        "https://api.fonnte.com/send",
-        headers={
-            "Authorization": token
-        },
-        data={
-            "target": phone,
-            "message": f"""
-Kode OTP Login MONIT
-
-{otp}
-
-Berlaku selama 5 menit.
-Jangan berikan kode ini kepada siapa pun.
-"""
-        }
     )
-def login_page():
 
-  def login_page():
-
-    st.title("🔐 Login MONIT")
-    st.markdown("---")
-
-    # =============================
-    # STEP 1 LOGIN
-    # =============================
-
-    if not st.session_state.otp_sent:
-
-        username = st.text_input("Username")
-
-        password = st.text_input(
-            "Password",
-            type="password"
-        )
-
-        if st.button(
-            "Login",
-            use_container_width=True
-        ):
-
-            if check_login(username, password):
-
-                otp = str(
-                    secrets.randbelow(900000) + 100000
-                )
-
-                st.session_state.otp = otp
-                st.session_state.username = username
-                st.session_state.otp_sent = True
-                st.session_state.otp_expired = (
-                    datetime.now() +
-                    timedelta(minutes=5)
-                )
-
-                phone = st.secrets["phone"][username]
-
-                send_otp(
-                    phone,
-                    otp
-                )
-
-                st.success(
-                    "OTP berhasil dikirim ke WhatsApp."
-                )
-
-                st.rerun()
-
-            else:
-
-                st.error(
-                    "Username / Password salah."
-                )
-
-    # =============================
-    # STEP 2 OTP
-    # =============================
-
-    else:
-
-        st.success(
-            "Masukkan OTP yang dikirim ke WhatsApp."
-        )
-
-        otp = st.text_input(
-            "Kode OTP"
-        )
-
-        if st.button(
-            "Verifikasi OTP",
-            use_container_width=True
-        ):
-
-            if datetime.now() > st.session_state.otp_expired:
-
-                st.error(
-                    "OTP sudah kedaluwarsa."
-                )
-
-                st.session_state.otp_sent = False
-
-                st.rerun()
-
-            elif otp == st.session_state.otp:
-
-                st.session_state.logged_in = True
-                st.session_state.otp_sent = False
-                st.session_state.otp = None
-
-                st.rerun()
-
-            else:
-
-                st.error("OTP salah.")
 
 # =====================================================
-# UI
+# VALIDASI EXCEL
 # =====================================================
 
-st.set_page_config(
-    page_title="MONIT Importer",
-    layout="wide"
-)
+REQUIRED_COLUMNS = [
 
-# ==========================
-# CEK LOGIN
-# ==========================
+    "Nama",
 
-if not st.session_state.logged_in:
-    login_page()
-    st.stop()
+    "ID TICKET",
 
-# ==========================
-# HEADER
-# ==========================
+    "SBU",
 
-col1, col2 = st.columns([8,2])
+    "Eskalasi Back Office",
+
+    "Create Ticket Date",
+
+    "Create Ticket Time",
+
+    "Hasil Eskalasi"
+
+]
+
+
+def validate_dataframe(df):
+
+    missing = [
+
+        col
+
+        for col in REQUIRED_COLUMNS
+
+        if col not in df.columns
+
+    ]
+
+    return missing
+
+# =====================================================
+# MAIN UI
+# =====================================================
+
+col1, col2 = st.columns([8, 2])
 
 with col1:
-    st.title("Excel → Google Form MONIT")
+
+    st.title("📊 Excel → Google Form MONIT")
 
 with col2:
 
-    st.write(f"👤 Login : **{st.session_state.username}**")
+    st.write(
+        f"👤 **{st.session_state.username}**"
+    )
 
-    if st.button("Logout"):
+    if st.button(
+        "Logout",
+        use_container_width=True
+    ):
 
         st.session_state.logged_in = False
         st.session_state.username = ""
+        st.session_state.otp = ""
+        st.session_state.otp_sent = False
+        st.session_state.otp_expired = None
+        st.session_state.otp_try = 0
 
         st.rerun()
 
-# ==========================
+st.divider()
+
+# =====================================================
 # STATUS
-# ==========================
+# =====================================================
 
 col1, col2 = st.columns(2)
 
 with col1:
 
-    if st.button("Reset Progress"):
+    if st.button(
+        "🔄 Reset Progress",
+        use_container_width=True
+    ):
 
         reset_progress()
 
-        st.success("Progress berhasil direset")
+        st.success(
+            "Progress berhasil direset."
+        )
 
 with col2:
 
@@ -454,152 +593,229 @@ with col2:
         f"Last Success Row : {load_progress()}"
     )
 
-# ==========================
-# SETTING
-# ==========================
+st.divider()
 
-min_delay = st.number_input(
-    "Min Delay",
-    min_value=1,
-    max_value=60,
-    value=10
-)
+# =====================================================
+# DELAY
+# =====================================================
 
-max_delay = st.number_input(
-    "Max Delay",
-    min_value=1,
-    max_value=120,
-    value=30
-)
+col1, col2 = st.columns(2)
 
-# ==========================
+with col1:
+
+    min_delay = st.number_input(
+
+        "Min Delay (detik)",
+
+        min_value=1,
+
+        max_value=60,
+
+        value=10
+
+    )
+
+with col2:
+
+    max_delay = st.number_input(
+
+        "Max Delay (detik)",
+
+        min_value=1,
+
+        max_value=120,
+
+        value=30
+
+    )
+
+st.divider()
+
+# =====================================================
 # UPLOAD
-# ==========================
+# =====================================================
 
 file = st.file_uploader(
+
     "Upload Excel",
+
     type=["xlsx"]
+
 )
 
+if file is None:
+
+    st.info(
+        "Silakan upload file Excel."
+    )
+
+    st.stop()
+
 # =====================================================
-# PROCESS
+# READ EXCEL
 # =====================================================
 
-if file:
+try:
 
     df = pd.read_excel(
+
         file,
+
         engine="openpyxl"
+
     )
 
-    st.dataframe(df.head())
+except Exception as e:
 
-    required_cols = [
+    st.error(str(e))
 
-        "Nama",
-        "ID TICKET",
-        "SBU",
-        "Eskalasi Back Office",
-        "Create Ticket Date",
-        "Create Ticket Time",
-        "Hasil Eskalasi"
+    st.stop()
 
-    ]
+# =====================================================
+# VALIDASI
+# =====================================================
 
-    missing = [
+missing = validate_dataframe(df)
 
-        c for c in required_cols
+if missing:
 
-        if c not in df.columns
-    ]
+    st.error(
 
-    if missing:
+        f"Kolom berikut tidak ditemukan:\n\n{missing}"
 
-        st.error(
-            f"Kolom tidak ditemukan: "
-            f"{missing}"
-        )
-
-        st.stop()
-
-    st.write(
-        f"Total Data : {len(df)}"
     )
 
-    if st.button(
-        "START IMPORT"
+    st.stop()
+
+# =====================================================
+# PREVIEW
+# =====================================================
+
+st.success(
+
+    f"Total Data : {len(df)}"
+
+)
+
+st.dataframe(
+
+    df.head(10),
+
+    use_container_width=True
+
+)
+
+st.divider()
+
+# =====================================================
+# IMPORT
+# =====================================================
+
+if st.button(
+
+    "🚀 START IMPORT",
+
+    use_container_width=True,
+
+    type="primary"
+
+):
+
+    start_row = load_progress()
+
+    session = requests.Session()
+
+    progress = st.progress(0)
+
+    status = st.empty()
+
+    success = 0
+
+    failed = 0
+
+    global last_submit_time
+
+    for idx in range(
+
+        start_row,
+
+        len(df)
+
     ):
 
-        start_row = load_progress()
+        row = df.iloc[idx]
 
-        session = requests.Session()
+        payload = build_payload(row)
 
-        progress_bar = st.progress(0)
+        ok, err = submit_form(
 
-        status_box = st.empty()
+            session,
 
-        success = 0
-        failed = 0
+            payload
 
-        for idx in range(
-            start_row,
-            len(df)
-        ):
-
-            row = df.iloc[idx]
-
-            payload = build_payload(
-                row
-            )
-
-            ok, err = submit_form(
-                session,
-                payload
-            )
-
-            if ok:
-                
-                last_submit_time = datetime.now(
-                    ZoneInfo("Asia/Jakarta")
-                )
-            
-                save_progress(
-                    idx + 1
-                )
-            
-                success += 1
-
-                status_box.success(
-                    f"✓ {row['ID TICKET']}"
-                )
-
-            else:
-
-                failed += 1
-
-                status_box.error(
-                    f"✗ {row['ID TICKET']} | {err}"
-                )
-
-            progress_bar.progress(
-                (idx + 1) / len(df)
-            )
-
-            if idx < len(df) - 1:
-
-                delay = random.randint(
-                    min_delay,
-                    max_delay
-                )
-
-                time.sleep(delay)
-
-        st.success(
-            f"""
-Import selesai
-
-Berhasil : {success}
-
-Gagal : {failed}
-"""
         )
+
+        if ok:
+
+            last_submit_time = datetime.now(
+
+                ZoneInfo("Asia/Jakarta")
+
+            )
+
+            save_progress(
+
+                idx + 1
+
+            )
+
+            success += 1
+
+            status.success(
+
+                f"✅ {row['ID TICKET']} berhasil"
+
+            )
+
+        else:
+
+            failed += 1
+
+            status.error(
+
+                f"❌ {row['ID TICKET']} | {err}"
+
+            )
+
+        progress.progress(
+
+            (idx + 1) / len(df)
+
+        )
+
+        if idx < len(df) - 1:
+
+            delay = random.randint(
+
+                min_delay,
+
+                max_delay
+
+            )
+
+            time.sleep(delay)
+
+    st.balloons()
+
+    st.success(
+
+        f"""
+### Import Selesai
+
+✅ Berhasil : **{success}**
+
+❌ Gagal : **{failed}**
+
+Total Data : **{len(df)}**
+"""
+    )
