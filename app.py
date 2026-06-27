@@ -263,10 +263,6 @@ def submit_form(session, payload):
         time.sleep(3)
 
     return False, last_error
-
-# =====================================================
-# UI
-# =====================================================
 # =====================================================
 # UI
 # =====================================================
@@ -345,9 +341,9 @@ with st.sidebar:
 
         st.rerun()
 
-st.title("📊 Excel → Google Form MONIT")
-
-col1, col2 = st.columns(2)
+            st.title("📊 Excel → Google Form MONIT")
+            
+            col1, col2 = st.columns(2)
 
 # =====================================================
 # PROCESS
