@@ -264,30 +264,57 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title(
-    "Excel → Google Form MONIT"
-)
+# ==========================
+# CEK LOGIN
+# ==========================
+
+if not st.session_state.logged_in:
+    login_page()
+    st.stop()
+
+# ==========================
+# HEADER
+# ==========================
+
+col1, col2 = st.columns([8,2])
+
+with col1:
+    st.title("Excel → Google Form MONIT")
+
+with col2:
+
+    st.write(f"👤 Login : **{st.session_state.username}**")
+
+    if st.button("Logout"):
+
+        st.session_state.logged_in = False
+        st.session_state.username = ""
+
+        st.rerun()
+
+# ==========================
+# STATUS
+# ==========================
 
 col1, col2 = st.columns(2)
 
 with col1:
 
-    if st.button(
-        "Reset Progress"
-    ):
+    if st.button("Reset Progress"):
 
         reset_progress()
 
-        st.success(
-            "Progress berhasil direset"
-        )
+        st.success("Progress berhasil direset")
 
 with col2:
 
     st.info(
-        f"Last Success Row : "
-        f"{load_progress()}"
+        f"Last Success Row : {load_progress()}"
     )
+
+# ==========================
+# SETTING
+# ==========================
 
 min_delay = st.number_input(
     "Min Delay",
@@ -302,6 +329,10 @@ max_delay = st.number_input(
     max_value=120,
     value=30
 )
+
+# ==========================
+# UPLOAD
+# ==========================
 
 file = st.file_uploader(
     "Upload Excel",
