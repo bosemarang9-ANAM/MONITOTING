@@ -12,25 +12,12 @@ from zoneinfo import ZoneInfo
 # =====================================================
 # CONFIG
 # =====================================================
+
 FORM_URL = (
     "https://docs.google.com/forms/u/0/d/e/"
     "1FAIpQLSdYY2hbRIhrCY_a06uH0keEsBBu8x6P3AzpZ2BmcmVERjaxpQ"
     "/formResponse"
 )
-USERS = {
-    "cs": {
-        "password": "cs123",
-        "role": "CS"
-    }
-}
-if "login" not in st.session_state:
-    st.session_state.login = False
-
-if "username" not in st.session_state:
-    st.session_state.username = ""
-
-if "role" not in st.session_state:
-    st.session_state.role = ""
 
 PROGRESS_FILE = "progress.json"
 # =====================================================
@@ -257,6 +244,7 @@ def submit_form(session, payload):
         time.sleep(3)
 
     return False, last_error
+
 # =====================================================
 # UI
 # =====================================================
@@ -266,78 +254,49 @@ st.set_page_config(
     layout="wide"
 )
 
-st.markdown("""
-<style>
+st.title(
+    "Excel → Google Form MONIT"
+)
 
-.stApp{
-    background: linear-gradient(135deg,#0f172a,#1e3a8a,#2563eb);
-}
-
-[data-testid="stSidebar"]{
-    background:#111827;
-}
-
-.block-container{
-    background:rgba(255,255,255,.92);
-    border-radius:20px;
-    padding:30px;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-if "login" not in st.session_state:
-    st.session_state.login = False
-
-if "username" not in st.session_state:
-    st.session_state.username = ""
-
-if "role" not in st.session_state:
-    st.session_state.role = ""
-
-def login():
-
-    st.title("🔐 LOGIN MONIT IMPORTER")
-
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-
-    if st.button("LOGIN"):
-
-        if username in USERS and USERS[username]["password"] == password:
-
-            st.session_state.login = True
-            st.session_state.username = username
-            st.session_state.role = USERS[username]["role"]
-
-            st.rerun()
-
-        else:
-            st.error("Username atau Password salah")
-
-if not st.session_state.login:
-    login()
-    st.stop()
-
-with st.sidebar:
-
-    st.title("📊 MONIT")
-
-    st.success(f"👤 {st.session_state.username}")
-
-    st.write(st.session_state.role)
-
-    if st.button("Logout"):
-
-        st.session_state.login = False
-        st.session_state.username = ""
-        st.session_state.role = ""
-
-        st.rerun()
-
-st.title("📊 Excel → Google Form MONIT")
-            
 col1, col2 = st.columns(2)
+
+with col1:
+
+    if st.button(
+        "Reset Progress"
+    ):
+
+        reset_progress()
+
+        st.success(
+            "Progress berhasil direset"
+        )
+
+with col2:
+
+    st.info(
+        f"Last Success Row : "
+        f"{load_progress()}"
+    )
+
+min_delay = st.number_input(
+    "Min Delay",
+    min_value=1,
+    max_value=60,
+    value=10
+)
+
+max_delay = st.number_input(
+    "Max Delay",
+    min_value=1,
+    max_value=120,
+    value=30
+)
+
+file = st.file_uploader(
+    "Upload Excel",
+    type=["xlsx"]
+)
 
 # =====================================================
 # PROCESS
