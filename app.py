@@ -10,6 +10,16 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 # =====================================================
+# LOGIN SESSION
+# =====================================================
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
+# =====================================================
 # CONFIG
 # =====================================================
 
