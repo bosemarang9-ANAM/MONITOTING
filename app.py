@@ -13,6 +13,25 @@ from zoneinfo import ZoneInfo
 # CONFIG
 # =====================================================
 
+USERS = {
+    "admin": {
+        "password": "admin123",
+        "role": "Admin"
+    },
+    "cs": {
+        "password": "cs123",
+        "role": "CS"
+    }
+}
+if "login" not in st.session_state:
+    st.session_state.login = False
+
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
+if "role" not in st.session_state:
+    st.session_state.role = ""
+
 FORM_URL = (
     "https://docs.google.com/forms/u/0/d/e/"
     "1FAIpQLSdYY2hbRIhrCY_a06uH0keEsBBu8x6P3AzpZ2BmcmVERjaxpQ"
@@ -249,10 +268,62 @@ def submit_form(session, payload):
 # UI
 # =====================================================
 
+if not st.session_state.login:
+    login()
+    st.stop()
+
+def login():
+
+    st.title("🔐 LOGIN MONIT IMPORTER")
+
+    username = st.text_input("Username")
+
+    password = st.text_input(
+        "Password",
+        type="password"
+    )
+
+    if st.button("LOGIN"):
+
+        if username in USERS:
+
+            if USERS[username]["password"] == password:
+
+                st.session_state.login = True
+                st.session_state.username = username
+                st.session_state.role = USERS[username]["role"]
+
+                st.rerun()
+
+        st.error("Username atau Password salah")
+
 st.set_page_config(
     page_title="MONIT Importer",
     layout="wide"
 )
+st.markdown("""
+<style>
+
+.stApp{
+    background: linear-gradient(135deg,#0f172a,#1e3a8a,#2563eb);
+}
+
+[data-testid="stSidebar"]{
+    background:#111827;
+}
+
+.block-container{
+    background:rgba(255,255,255,.92);
+    padding:30px;
+    border-radius:20px;
+}
+
+h1,h2,h3{
+    color:#0f172a;
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 st.title(
     "Excel → Google Form MONIT"
