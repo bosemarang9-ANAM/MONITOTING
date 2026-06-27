@@ -12,7 +12,11 @@ from zoneinfo import ZoneInfo
 # =====================================================
 # CONFIG
 # =====================================================
-
+FORM_URL = (
+    "https://docs.google.com/forms/u/0/d/e/"
+    "1FAIpQLSdYY2hbRIhrCY_a06uH0keEsBBu8x6P3AzpZ2BmcmVERjaxpQ"
+    "/formResponse"
+)
 USERS = {
     "cs": {
         "password": "cs123",
@@ -27,12 +31,6 @@ if "username" not in st.session_state:
 
 if "role" not in st.session_state:
     st.session_state.role = ""
-
-FORM_URL = (
-    "https://docs.google.com/forms/u/0/d/e/"
-    "1FAIpQLSdYY2hbRIhrCY_a06uH0keEsBBu8x6P3AzpZ2BmcmVERjaxpQ"
-    "/formResponse"
-)
 
 PROGRESS_FILE = "progress.json"
 # =====================================================
