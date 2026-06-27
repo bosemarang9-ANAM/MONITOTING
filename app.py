@@ -74,7 +74,6 @@ def generate_otp():
     )
 
 def send_otp(username):
-
     otp = generate_otp()
 
     st.session_state.otp = otp
@@ -106,19 +105,24 @@ OTP berlaku selama 5 menit.
 Jangan berikan kode ini kepada siapa pun.
 """
 
-    r = requests.post(
-        "https://api.fonnte.com/send",
-        headers={
-            "Authorization": token
-        },
-        data={
-            "target": phone,
-            "message": message
-        },
-        timeout=30
-    )
+    try:
+        r = requests.post(
+            "https://api.fonnte.com/send",
+            headers={
+                "Authorization": token
+            },
+            data={
+                "target": phone,
+                "message": message
+            },
+            timeout=30
+        )
 
-    return r.status_code == 200
+        return r.status_code == 200
+
+    except requests.RequestException as e:
+        st.error(f"Gagal menghubungi Fonnte: {e}")
+        return False
 
 # =====================================================
 # LOGIN PAGE
