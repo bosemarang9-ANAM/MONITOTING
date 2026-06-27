@@ -733,8 +733,6 @@ if st.button(
 
     failed = 0
 
-    global last_submit_time
-
     for idx in range(
 
         start_row,
