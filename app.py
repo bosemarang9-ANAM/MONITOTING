@@ -95,58 +95,7 @@ def send_otp(username):
         st.error(f"Token Fonnte untuk '{username}' belum dikonfigurasi.")
         return False
 
-    message = f"""
-    
-🔐 LOGIN MONIT
-
-Kode OTP Anda
-
-{otp}
-
-OTP berlaku selama 5 menit.
-
-Jangan berikan kode ini kepada siapa pun.
-"""
-
-    r = requests.post(
-        "https://api.fonnte.com/send",
-        headers={
-            "Authorization": token
-        },
-        data={
-            "target": phone,
-            "message": message
-        },
-        timeout=30
-    )
-
-    return r.status_code == 200
-🔐 LOGIN MONIT
-
-Kode OTP Anda
-
-{otp}
-
-OTP berlaku selama 5 menit.
-
-Jangan berikan kode ini kepada siapa pun.
-"""
-
-    r = requests.post(
-        "https://api.fonnte.com/send",
-        headers={
-            "Authorization": token
-        },
-        data={
-            "target": phone,
-            "message": message
-        },
-        timeout=30
-    )
-
-    return r.status_code == 200
-    
-🔐 LOGIN MONIT
+    message = f"""🔐 LOGIN MONIT
 
 Kode OTP Anda
 
