@@ -4,6 +4,7 @@ import requests
 import random
 import time
 import json
+import secrets
 
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -18,6 +19,15 @@ if "logged_in" not in st.session_state:
 
 if "username" not in st.session_state:
     st.session_state.username = ""
+
+if "otp" not in st.session_state:
+    st.session_state.otp = None
+
+if "otp_sent" not in st.session_state:
+    st.session_state.otp_sent = False
+
+if "otp_expired" not in st.session_state:
+    st.session_state.otp_expired = None
 
 # =====================================================
 # CONFIG
@@ -267,39 +277,125 @@ def check_login(username, password):
 
     return users[username] == password
 
+def send_otp(phone, otp):
 
+    token = st.secrets["fonnte"]["token"]
+
+    requests.post(
+        "https://api.fonnte.com/send",
+        headers={
+            "Authorization": token
+        },
+        data={
+            "target": phone,
+            "message": f"""
+Kode OTP Login MONIT
+
+{otp}
+
+Berlaku selama 5 menit.
+Jangan berikan kode ini kepada siapa pun.
+"""
+        }
+    )
 def login_page():
 
-    st.title("🔐 Login MONIT")
+  def login_page():
 
+    st.title("🔐 Login MONIT")
     st.markdown("---")
 
-    username = st.text_input(
-        "Username"
-    )
+    # =============================
+    # STEP 1 LOGIN
+    # =============================
 
-    password = st.text_input(
-        "Password",
-        type="password"
-    )
+    if not st.session_state.otp_sent:
 
-    if st.button(
-        "Login",
-        use_container_width=True
-    ):
+        username = st.text_input("Username")
 
-        if check_login(username, password):
+        password = st.text_input(
+            "Password",
+            type="password"
+        )
 
-            st.session_state.logged_in = True
-            st.session_state.username = username
+        if st.button(
+            "Login",
+            use_container_width=True
+        ):
 
-            st.rerun()
+            if check_login(username, password):
 
-        else:
+                otp = str(
+                    secrets.randbelow(900000) + 100000
+                )
 
-            st.error(
-                "Username atau Password salah."
-            )
+                st.session_state.otp = otp
+                st.session_state.username = username
+                st.session_state.otp_sent = True
+                st.session_state.otp_expired = (
+                    datetime.now() +
+                    timedelta(minutes=5)
+                )
+
+                phone = st.secrets["phone"][username]
+
+                send_otp(
+                    phone,
+                    otp
+                )
+
+                st.success(
+                    "OTP berhasil dikirim ke WhatsApp."
+                )
+
+                st.rerun()
+
+            else:
+
+                st.error(
+                    "Username / Password salah."
+                )
+
+    # =============================
+    # STEP 2 OTP
+    # =============================
+
+    else:
+
+        st.success(
+            "Masukkan OTP yang dikirim ke WhatsApp."
+        )
+
+        otp = st.text_input(
+            "Kode OTP"
+        )
+
+        if st.button(
+            "Verifikasi OTP",
+            use_container_width=True
+        ):
+
+            if datetime.now() > st.session_state.otp_expired:
+
+                st.error(
+                    "OTP sudah kedaluwarsa."
+                )
+
+                st.session_state.otp_sent = False
+
+                st.rerun()
+
+            elif otp == st.session_state.otp:
+
+                st.session_state.logged_in = True
+                st.session_state.otp_sent = False
+                st.session_state.otp = None
+
+                st.rerun()
+
+            else:
+
+                st.error("OTP salah.")
 
 # =====================================================
 # UI
