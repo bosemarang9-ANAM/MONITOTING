@@ -75,16 +75,54 @@ def generate_otp():
 
 def send_otp(username):
     
+    def send_otp(username):
+
+    otp = generate_otp()
+
+    st.session_state.otp = otp
+    st.session_state.otp_sent = True
+    st.session_state.otp_try = 0
+    st.session_state.otp_expired = (
+        datetime.now() +
+        timedelta(minutes=5)
+    )
+
     phone = st.secrets["phone"].get(username)
     token = st.secrets["fonnte"].get(username)
-    
+
     if not phone:
         st.error(f"Nomor WhatsApp untuk '{username}' belum dikonfigurasi.")
         return False
-    
+
     if not token:
         st.error(f"Token Fonnte untuk '{username}' belum dikonfigurasi.")
         return False
+
+    message = f"""
+🔐 LOGIN MONIT
+
+Kode OTP Anda
+
+{otp}
+
+OTP berlaku selama 5 menit.
+
+Jangan berikan kode ini kepada siapa pun.
+"""
+
+    r = requests.post(
+        "https://api.fonnte.com/send",
+        headers={
+            "Authorization": token
+        },
+        data={
+            "target": phone,
+            "message": message
+        },
+        timeout=30
+    )
+
+    return r.status_code == 200
     
 🔐 LOGIN MONIT
 
