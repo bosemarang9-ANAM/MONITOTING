@@ -15,8 +15,9 @@ from zoneinfo import ZoneInfo
 
 FORM_URL = (
     "https://docs.google.com/forms/u/0/d/e/"
-    "1FAIpQLSdYY2hbRIhrCY_a06uH0keEsBBu8x6P3AzpZ2BmcmVERjaxpQ"
+    "1FAIpQLSctpoBfTJgwKF-OlWTSskmE8_nnxHL08gPLdweUzJb4xx5XSw/"
     "/formResponse"
+   
 )
 
 PROGRESS_FILE = "progress.json"
@@ -86,7 +87,7 @@ def get_pickup_time():
     if last_submit_time is None:
 
         pickup = now - timedelta(
-            seconds=random.randint(30, 60)
+            seconds=random.randint(10, 30)
         )
 
     # Data berikutnya
@@ -110,15 +111,15 @@ def build_payload(row):
 
     pickup = get_pickup_time()
 
-    payload["entry.141665543_hour"] = (
+    payload["entry.1413751263_hour"] = (
         pickup.strftime("%H")
     )
 
-    payload["entry.141665543_minute"] = (
+    payload["entry.1413751263_minute"] = (
         pickup.strftime("%M")
     )
 
-    payload["entry.141665543_second"] = (
+    payload["entry.1413751263_second"] = (
         pickup.strftime("%S")
     )
 
@@ -132,27 +133,27 @@ def build_payload(row):
         dayfirst=True
     )
 
-    payload["entry.2062984122_hour"] = (
+    payload["entry.898331271_hour"] = (
         create_dt.strftime("%H")
     )
 
-    payload["entry.2062984122_minute"] = (
+    payload["entry.898331271_minute"] = (
         create_dt.strftime("%M")
     )
 
-    payload["entry.2062984122_second"] = (
+    payload["entry.898331271_second"] = (
         create_dt.strftime("%S")
     )
 
-    payload["entry.1418866853_day"] = (
+    payload["entry.192424872_day"] = (
         create_dt.strftime("%d")
     )
 
-    payload["entry.1418866853_month"] = (
+    payload["entry.192424872_month"] = (
         create_dt.strftime("%m")
     )
 
-    payload["entry.1418866853_year"] = (
+    payload["entry.192424872_year"] = (
         create_dt.strftime("%Y")
     )
 
@@ -160,30 +161,30 @@ def build_payload(row):
     # FIELD FORM
     # ---------------------------------
 
-    payload["entry.154565194"] = clean(
+    payload["entry.1884265043"] = clean(
         row["Nama"]
     )
 
-    payload["entry.1778899713"] = clean(
+    payload["entry.7318026"] = clean(
         row["SBU"]
     )
 
-    payload["entry.1802806380"] = clean(
+    payload["entry.1212348438"] = clean(
         row["ID TICKET"]
     )
 
-    payload["entry.564067612"] = clean(
+    payload["entry.801056764"] = clean(
         row.get(
             "Keterangan Tambahan",
             ""
         )
     )
 
-    payload["entry.822984039"] = clean(
+    payload["entry.513669972"] = clean(
         row["Eskalasi Back Office"]
     )
 
-    payload["entry.49503729"] = clean(
+    payload["entry.286520927"] = clean(
         row["Hasil Eskalasi"]
     )
 
@@ -255,7 +256,7 @@ st.set_page_config(
 )
 
 st.title(
-    "Excel → Google Form MONIT"
+    "Excel → Google Form MONIT COBA"
 )
 
 col1, col2 = st.columns(2)
