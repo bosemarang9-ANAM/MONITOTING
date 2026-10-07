@@ -15,9 +15,8 @@ from zoneinfo import ZoneInfo
 
 FORM_URL = (
     "https://docs.google.com/forms/u/0/d/e/"
-    "1FAIpQLSctpoBfTJgwKF-OlWTSskmE8_nnxHL08gPLdweUzJb4xx5XSw/"
-    "formResponse"
-   
+    "1FAIpQLScd5tNNBOrQkyN58qnA9dRwNxbm1cot5D80rQthgIUpkkTQPw"
+    "/formResponse"
 )
 
 PROGRESS_FILE = "progress.json"
@@ -74,7 +73,6 @@ def clean(value):
 
     return str(value).strip()
 
-
 def get_pickup_time():
 
     global last_submit_time
@@ -87,13 +85,18 @@ def get_pickup_time():
     if last_submit_time is None:
 
         pickup = now - timedelta(
-            seconds=random.randint(10, 30)
+            seconds=random.randint(20, 40)
         )
 
     # Data berikutnya
     else:
 
-        pickup = last_submit_time
+        pickup = last_submit_time + timedelta(
+            seconds=random.randint(1, 10)
+        )
+
+    # Simpan pickup terakhir
+    last_submit_time = pickup
 
     return pickup
 
@@ -111,15 +114,15 @@ def build_payload(row):
 
     pickup = get_pickup_time()
 
-    payload["entry.1413751263_hour"] = (
+    payload["entry.141665543_hour"] = (
         pickup.strftime("%H")
     )
 
-    payload["entry.1413751263_minute"] = (
+    payload["entry.141665543_minute"] = (
         pickup.strftime("%M")
     )
 
-    payload["entry.1413751263_second"] = (
+    payload["entry.141665543_second"] = (
         pickup.strftime("%S")
     )
 
@@ -133,27 +136,27 @@ def build_payload(row):
         dayfirst=True
     )
 
-    payload["entry.898331271_hour"] = (
+    payload["entry.2062984122_hour"] = (
         create_dt.strftime("%H")
     )
 
-    payload["entry.898331271_minute"] = (
+    payload["entry.2062984122_minute"] = (
         create_dt.strftime("%M")
     )
 
-    payload["entry.898331271_second"] = (
+    payload["entry.2062984122_second"] = (
         create_dt.strftime("%S")
     )
 
-    payload["entry.192424872_day"] = (
+    payload["entry.1418866853_day"] = (
         create_dt.strftime("%d")
     )
 
-    payload["entry.192424872_month"] = (
+    payload["entry.1418866853_month"] = (
         create_dt.strftime("%m")
     )
 
-    payload["entry.192424872_year"] = (
+    payload["entry.1418866853_year"] = (
         create_dt.strftime("%Y")
     )
 
@@ -161,30 +164,30 @@ def build_payload(row):
     # FIELD FORM
     # ---------------------------------
 
-    payload["entry.1884265043"] = clean(
+    payload["entry.154565194"] = clean(
         row["Nama"]
     )
 
-    payload["entry.7318026"] = clean(
+    payload["entry.1778899713"] = clean(
         row["SBU"]
     )
 
-    payload["entry.1212348438"] = clean(
+    payload["entry.1802806380"] = clean(
         row["ID TICKET"]
     )
 
-    payload["entry.801056764"] = clean(
+    payload["entry.564067612"] = clean(
         row.get(
             "Keterangan Tambahan",
             ""
         )
     )
 
-    payload["entry.513669972"] = clean(
+    payload["entry.822984039"] = clean(
         row["Eskalasi Back Office"]
     )
 
-    payload["entry.286520927"] = clean(
+    payload["entry.49503729"] = clean(
         row["Hasil Eskalasi"]
     )
 
@@ -256,7 +259,7 @@ st.set_page_config(
 )
 
 st.title(
-    "Excel → Google Form MONIT COBA"
+    "Excel → Google Form MONIT"
 )
 
 col1, col2 = st.columns(2)
